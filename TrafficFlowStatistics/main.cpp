@@ -25,20 +25,21 @@ int main(int argc, char* argv[])
 	//{
 	//	cout << exc.what() << endl;
 	//}
+	int keyboard = 0;
 
 	//cvReleaseImage(&currentFrame);
 	namedWindow("Frame");
-	//namedWindow("FG Mask MOG");
-	VehicleRecognizer VehicleRec("source.mp4");
-	for(;;)
+	////namedWindow("FG Mask MOG");
+	VehicleRecognizer VehicleRec("video.avi", false);
+	while((char)keyboard != 'q' && (char)keyboard != 27)
 	{
 		if (!VehicleRec.ProcessNextFrame())
 			break;
 		imshow("Frame", VehicleRec.getNextFrameMat());
-		cvWaitKey(20);
+		keyboard = waitKey(30);
 	}
 
 	system("pause");
 	cv::destroyAllWindows();
-	return 0;
+	return EXIT_SUCCESS;
 }
