@@ -25,17 +25,47 @@ private:
 	std::stringstream ss;
 	//Use MOG2 substraction method flag
 	bool mbUseMOG2;
+	//threshold minimum value
+	int thresholdMin;
+	//Erosion operation
+	int erosion_elem;
+	int erosion_size;
+	void Erosion();
+	//Dilation operation
+	int dilation_elem;
+	int dilation_size;
+	void Dilation();
+	//Blur size
+	Size blur_size;
+	//Max erosion/dilation size
+	int static const max_kernel_size = 21;
 public:
 	bool ProcessNextFrame();
+	//Returns the next frame
 	Mat getNextFrameMat();
+	//Returns binary frame
+	Mat getNextFrameBinary();
 	//Gets source filename.
 	string getSourceVideoFileName();
 	//Sets source filename.
 	void setSourceVideoFileName(string SourceVideoFileName);
+	//Sets threshold minimum
+	void setThresholdMinimum(int value);
+	//Sets blur size
+	void setBlurSize(Size sz);
+	//Sets erosion size
+	void setErosionSize(int size);
+	//Sets dilation size
+	void setDilationSize(int size);
 	/*
 	Constructor
 	*/
-	VehicleRecognizer(string SourceVideoFileName, bool UseMOG2Substraction = false);
+	VehicleRecognizer(string SourceVideoFileName, 
+		bool UseMOG2Substraction = false, 
+		int ThresholdMinimum = 220, 
+		int erosion_elem = 0, 
+		int dilation_elem = 0
+		);
 	/*
 	Default constuctor
 	*/
