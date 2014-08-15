@@ -19,6 +19,17 @@ bool VehicleRecognizer::ProcessNextFrame()
 	Erosion();
 	//Apply the dilation operation
 	Dilation();
+	//Find contours
+	findContours(fgMaskMOG, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
+	//Draw contours if needed
+	if (doDrawing)
+	{
+		for( int i = 0; i< contours.size(); i++ )
+		 {
+		   drawContours( frame, contours, i, Scalar(255,0,0), 2, 8, hierarchy, 0, Point() );
+		 }
+	}
+	return true;
 }
 
 Mat VehicleRecognizer::getNextFrameMat()
@@ -52,6 +63,7 @@ void VehicleRecognizer::setThresholdMinimum(int value)
 
 VehicleRecognizer::VehicleRecognizer (string SourceVideoFileName, bool UseMOG2Substraction, int ThresholdMinimum, int erosion_elem, int dilation_elem)
 {
+	this->doDrawing = true;
 	this->erosion_elem = erosion_elem;
 	this->erosion_size = 0;
 	this->dilation_elem = dilation_elem;
@@ -67,6 +79,7 @@ VehicleRecognizer::VehicleRecognizer (string SourceVideoFileName, bool UseMOG2Su
 
 VehicleRecognizer::VehicleRecognizer(void)
 {
+	this->doDrawing = true;
 	erosion_elem = 0;
 	erosion_size = 0;
 	dilation_elem = 0;
@@ -137,4 +150,15 @@ void VehicleRecognizer::setDilationSize(int size)
 	if(size <= max_kernel_size)
 		this->dilation_size = size;
 	else throw std::exception("Invelid dilation size");
+}
+
+//Gets next contours frame
+Mat VehicleRecognizer::getNextContoursFrame()
+{
+	return this->ContoursFrame;
+}
+
+void VehicleRecognizer::setDrawingFlag(bool doDrawing)
+{
+	this->doDrawing = doDrawing;
 }

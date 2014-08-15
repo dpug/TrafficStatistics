@@ -35,11 +35,11 @@ int main(int argc, char* argv[])
 		VehicleRec.setDilationSize(dilation_size);
 
 		//imshow("Frame", VehicleRec.getNextFrameMat());
-		imshow("Binary", VehicleRec.getNextFrameBinary());
+		imshow("Binary", VehicleRec.getNextFrameMat());
 		keyboard = waitKey(30);
 	}
 	system("pause");
 
 	cv::destroyAllWindows();
-	return EXIT_SUCCESS;
+	exit(0);
 }
