@@ -45,7 +45,12 @@ private:
 	vector<vector<Point>> contours;
 	//Hierarchy vector
 	vector<Vec4i> hierarchy;
+	//Moments vector
+	vector<Moments> mu;
+	//Mass centers
+	vector<Point2f> mc;
 	bool doDrawing;
+	void GetMoments();
 public:
 	bool ProcessNextFrame();
 	//Returns the next frame

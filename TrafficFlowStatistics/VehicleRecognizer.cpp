@@ -21,12 +21,17 @@ bool VehicleRecognizer::ProcessNextFrame()
 	Dilation();
 	//Find contours
 	findContours(fgMaskMOG, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
-	//Draw contours if needed
+	//Get the moments
+	GetMoments();
+
+	//Draw contours and mass centers if needed
 	if (doDrawing)
 	{
 		for( int i = 0; i< contours.size(); i++ )
 		 {
-		   drawContours( frame, contours, i, Scalar(255,0,0), 2, 8, hierarchy, 0, Point() );
+			 //drawContours( frame, contours, i, Scalar(255,0,0), 2, 8, hierarchy, 0, Point() );
+			 if (mc[i] != Point2f(0,0))
+				circle(frame, mc[i], 20, Scalar(0, 255, 0), -1, 8, 0);
 		 }
 	}
 	return true;
@@ -161,4 +166,25 @@ Mat VehicleRecognizer::getNextContoursFrame()
 void VehicleRecognizer::setDrawingFlag(bool doDrawing)
 {
 	this->doDrawing = doDrawing;
+}
+
+//Gets the moments of contours.
+void VehicleRecognizer::GetMoments()
+{
+	//Allocate vector size for all moments
+	mu = vector<Moments>(contours.size());
+	for(int i = 0; i < contours.size(); i++)
+	{
+		mu[i] = moments(contours[i], true);
+	}
+	//Get the mass centers
+	mc = vector<Point2f>(contours.size());
+	for (int i = 0; i < contours.size(); i++)
+	{
+		if (mu[i].m00 > 2000)
+			mc[i] = Point2f(mu[i].m10/mu[i].m00, mu[i].m01/mu[i].m00);
+		else
+			mc[i] = Point2f(0, 0);
+	}
+
 }
