@@ -13,6 +13,8 @@ int main(int argc, char* argv[])
 	//OpenCV windows
 	//namedWindow("Frame");
 	namedWindow("Binary");
+	//namedWindow("Erosion");
+	//namedWindow("Dilation");
 	createTrackbar( "Erosion size:\n 2n +1", "Binary", 
                   &erosion_size, 21);
 	createTrackbar( "Dilation size:\n 2n +1", "Binary", 
@@ -33,9 +35,10 @@ int main(int argc, char* argv[])
 
 		VehicleRec.setErosionSize(erosion_size);
 		VehicleRec.setDilationSize(dilation_size);
-
 		//imshow("Frame", VehicleRec.getNextFrameMat());
 		imshow("Binary", VehicleRec.getNextFrameMat());
+		//imshow("Erosion", VehicleRec.erosionMask);
+		//imshow("Dilation", VehicleRec.dilationMask);
 		keyboard = waitKey(30);
 	}
 	system("pause");
