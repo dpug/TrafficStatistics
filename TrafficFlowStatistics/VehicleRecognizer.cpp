@@ -21,18 +21,65 @@ bool VehicleRecognizer::ProcessNextFrame()
 	Dilation();
 	//Find contours
 	findContours(fgMaskMOG, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE);
-	////Get the moments
+	//Get the moments
 	GetMoments();
+
+	//Clear all contours < than min contour area
+	for(int i = 0; i < contours.size();)
+	{
+		if (mu[i].m00 <= this->minContourArea)
+		{
+			contours.erase(contours.begin() + i);
+			mu.erase(mu.begin() + i);
+			mc.erase(mc.begin() + i);
+		}
+		else
+			i++;
+	}
+
+	//Get bounding rectangles
+	contours_poly = vector<vector<Point>>(contours.size());
+	boundRect = vector<Rect>(contours.size());
+	for(int i = 0; i < contours.size(); i++)
+	{
+		//Make approximation
+		approxPolyDP(Mat(contours[i]), contours_poly[i], 3, true);
+		boundRect[i] = boundingRect(Mat(contours_poly[i]));
+	}
+
+	TrackVehicles();
 
 	//Draw contours and mass centers if needed
 	if (doDrawing)
 	{
-		for( int i = 0; i< contours.size(); i++ )
+		for( int i = 0; i < contours.size(); i++ )
 		 {
-			 drawContours( frame, contours, i, Scalar(255,0,0), 2, 8, hierarchy, 0, Point() );
-			 if (mc[i] != Point2f(0,0))
+			 //if (mu[i].m00 > this->minContourArea)
+			 //{
+				//drawContours( frame, contours, i, Scalar(255,0,0), 2, 8, hierarchy, 0, Point() );
+				//Draw bounding rectangle
+				rectangle( frame, boundRect[i].tl(), boundRect[i].br(), Scalar(0, 0, 255), 2, 8, 0 );
+
+				if (mc[i] != Point2f(0,0))
 				circle(frame, mc[i], 20, Scalar(0, 255, 0), -1, 4, 0);
+			 //}
 		 }
+		//Draw all trajectories
+		for (int i = 0; i < vehicles.size(); i++)
+		{
+			//Scalar sc = Scalar(rand() % 255, rand() % 255, rand() % 255);
+
+			if (vehicles[i].trajectory.size() > 2)
+			{
+				for(int j = 0; j < vehicles[i].trajectory.size() - 1; ++j)
+				{
+					line(frame, vehicles[i].trajectory[j], vehicles[i].trajectory[j+1], vehicles[i].drawingColor, 3);
+				}
+			}
+		}
+
+		//Put text
+		putText(frame, "Vehicles: " + std::to_string((_ULonglong)Vehicle::howMany()), Point(20,50), FONT_HERSHEY_PLAIN, 2,  Scalar(0,0,255), 2);
 	}
 	return true;
 }
@@ -66,17 +113,20 @@ void VehicleRecognizer::setThresholdMinimum(int value)
 	else throw std::exception("Threshold value must be in the interval (0,255]");
 }
 
-VehicleRecognizer::VehicleRecognizer (string SourceVideoFileName, bool UseMOG2Substraction, int ThresholdMinimum, int erosion_elem, int dilation_elem)
+VehicleRecognizer::VehicleRecognizer (string SourceVideoFileName, bool UseMOG2Substraction, int ThresholdMinimum, int erosion_elem, int dilation_elem, int minContoursArea)
 {
+	this->prevContoursCount = 0;
 	this->doDrawing = true;
 	this->erosion_elem = erosion_elem;
 	this->erosion_size = 0;
 	this->dilation_elem = dilation_elem;
 	this->dilation_size = 0;
+	this->minContourArea = minContoursArea;
 	this->thresholdMin = ThresholdMinimum;
 	this->mbUseMOG2 = UseMOG2Substraction;
 	this->SourceFileName = SourceVideoFileName;
 	this->blur_size = Size(3,3);
+	this->vehicles = vector<Vehicle>();
 	capture = VideoCapture(this->SourceFileName);
 	if (!capture.isOpened())
 		throw std::exception("Can't open source filename!");
@@ -84,15 +134,18 @@ VehicleRecognizer::VehicleRecognizer (string SourceVideoFileName, bool UseMOG2Su
 
 VehicleRecognizer::VehicleRecognizer(void)
 {
+	this->prevContoursCount = 0;
 	this->doDrawing = true;
 	erosion_elem = 0;
 	erosion_size = 0;
 	dilation_elem = 0;
 	dilation_size = 0;
 	this->thresholdMin = 220;
+	this->minContourArea = 2000;
 	this->mbUseMOG2 = false;
 	this->SourceFileName = nullptr;
 	this->blur_size = Size(3,3);
+	this->vehicles = vector<Vehicle>();
 	capture = VideoCapture(this->SourceFileName);
 	if (!capture.isOpened())
 		throw std::exception("Can't open source filename!");
@@ -181,10 +234,64 @@ void VehicleRecognizer::GetMoments()
 	mc = vector<Point2f>(contours.size());
 	for (int i = 0; i < contours.size(); i++)
 	{
-		if (mu[i].m00 > 2000)
+		if (mu[i].m00 > this->minContourArea)
 			mc[i] = Point2f(mu[i].m10/mu[i].m00, mu[i].m01/mu[i].m00);
 		else
 			mc[i] = Point2f(0, 0);
 	}
 
 }
+
+//Tracks vehicles
+void VehicleRecognizer::TrackVehicles()
+{
+	//Loop thru all vehicles and make them unsynchronized
+	for(int i = 0; i < vehicles.size(); i++)
+		vehicles[i].Synchronized = false;
+
+	//Loop thru all contours
+	for(int i = 0; i < contours.size(); i++)
+	{
+		bool vehicleFound = false;
+		//Finding vehicle
+		for(int j = 0; j < vehicles.size(); j++)
+		{
+			//IF CENTER OF CONTOUR IS INSIDE VEHICLE RECTANGLE
+			if (PointInsideRectange(mc[i], vehicles[j].getBoundingRectangle()))
+			{
+				//FLAG VEHICLE USED
+				vehicles[j].Synchronized = true;
+				//UPDATE VEHICLE DATA
+				vehicles[j].setCenterPoint(mc[i]);
+				vehicles[j].setBoundingRectangle(boundRect[i]);
+				//FLAG IS FOUND
+				vehicleFound = true;
+				break;
+			}
+		}
+		if (!vehicleFound)
+		{
+			//Create new vehicle
+			Vehicle v = Vehicle(mc[i], boundRect[i]);
+			v.Synchronized = true;
+			vehicles.push_back(v);
+		}
+	}
+	//LOOP THRU ALL VEHICLES
+	for(int i = 0; i < vehicles.size();)
+	{
+		//DELETE UNUSED
+		if (!vehicles[i].Synchronized)
+		{
+			vehicles.erase(vehicles.begin() + i);
+		}
+		else i++;
+	}
+}
+
+//Checks if point is inside the rectangle
+bool VehicleRecognizer::PointInsideRectange(Point p, Rect rect)
+{
+	return p.inside(rect);
+}
+
