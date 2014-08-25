@@ -4,6 +4,14 @@ bool VehicleRecognizer::ProcessNextFrame()
 {
 	if(!capture.read(frame))
 		return false;
+	//If this is the first frame
+	if(this->isTheFirstFrame)
+	{
+		//Initialize borders
+		this->leftBorder = frame.cols * 0.06;
+		this->rightBorder = frame.cols - this->leftBorder;
+		this->isTheFirstFrame = false;
+	}
 	//Blur image
 	blur(frame, frame, blur_size);
 	//Update background model
@@ -52,23 +60,27 @@ bool VehicleRecognizer::ProcessNextFrame()
 	//Draw contours and mass centers if needed
 	if (doDrawing)
 	{
-		for( int i = 0; i < contours.size(); i++ )
+		for( int i = 0; i < vehicles.size(); i++ )
 		 {
+			 if (!vehicles[i].isActive) continue;
 			 //if (mu[i].m00 > this->minContourArea)
 			 //{
 				//drawContours( frame, contours, i, Scalar(255,0,0), 2, 8, hierarchy, 0, Point() );
 				//Draw bounding rectangle
-				rectangle( frame, boundRect[i].tl(), boundRect[i].br(), Scalar(0, 0, 255), 2, 8, 0 );
+				//rectangle( frame, boundRect[i].tl(), boundRect[i].br(), Scalar(0, 0, 255), 2, 8, 0 );
+			 rectangle(frame, vehicles[i].getBoundingRectangle().tl(), vehicles[i].getBoundingRectangle().br(), Scalar(0, 0, 255), 2, 8, 0);
 
-				if (mc[i] != Point2f(0,0))
-				circle(frame, mc[i], 20, Scalar(0, 255, 0), -1, 4, 0);
+			/*if (mc[i] != Point2f(0,0))
+				circle(frame, mc[i], 20, Scalar(0, 255, 0), -1, 4, 0);*/
+			 if (vehicles[i].getCenterPoint() != Point(0,0))
+				 circle(frame, vehicles[i].getCenterPoint(), 20, Scalar(0, 255, 0), -1, 4, 0);
 			 //}
 		 }
 		//Draw all trajectories
 		for (int i = 0; i < vehicles.size(); i++)
 		{
 			//Scalar sc = Scalar(rand() % 255, rand() % 255, rand() % 255);
-
+			if (!vehicles[i].isActive) continue;
 			if (vehicles[i].trajectory.size() > 2)
 			{
 				for(int j = 0; j < vehicles[i].trajectory.size() - 1; ++j)
@@ -76,13 +88,36 @@ bool VehicleRecognizer::ProcessNextFrame()
 					line(frame, vehicles[i].trajectory[j], vehicles[i].trajectory[j+1], vehicles[i].drawingColor, 3);
 				}
 			}
+			//Draw next point
+			if(vehicles[i].nextPoint != Point(0,0))
+			{
+				circle(frame, vehicles[i].nextPoint, 5, vehicles[i].drawingColor, -1, 4, 0);
+			}
+			//Draw direction
+			string direction = "Direction: Right";
+			if (vehicles[i].direction)
+				direction = "Direction: Left";
+			putText(frame, direction, Point(vehicles[i].getCenterPoint().x + 50, vehicles[i].getCenterPoint().y - 20), FONT_HERSHEY_PLAIN, 1, Scalar(255,255,255),2,8);
+			putText(frame, "P FORWARD: " + stringify(vehicles[i].pForward), Point(vehicles[i].getCenterPoint().x + 50, vehicles[i].getCenterPoint().y - 35), FONT_HERSHEY_PLAIN, 1, Scalar(255,255,255),2,8);
+			putText(frame, "P BACK: " + stringify(vehicles[i].pBack), Point(vehicles[i].getCenterPoint().x + 50, vehicles[i].getCenterPoint().y - 50), FONT_HERSHEY_PLAIN, 1, Scalar(255,255,255),2,8);
+			putText(frame, "P LEFT: " + stringify(vehicles[i].pLeft), Point(vehicles[i].getCenterPoint().x + 50, vehicles[i].getCenterPoint().y - 65), FONT_HERSHEY_PLAIN, 1, Scalar(255,255,255),2,8);
+			putText(frame, "P RIGHT: " + stringify(vehicles[i].pRight), Point(vehicles[i].getCenterPoint().x + 50, vehicles[i].getCenterPoint().y - 80), FONT_HERSHEY_PLAIN, 1, Scalar(255,255,255),2,8);
 		}
 
 		//Put text
-		putText(frame, "Vehicles: " + std::to_string((_ULonglong)Vehicle::howMany()), Point(20,50), FONT_HERSHEY_PLAIN, 2,  Scalar(0,0,255), 2);
+		putText(frame, "Vehicles: " + std::to_string((_ULonglong)Vehicle::howMany()), Point(20,20), FONT_HERSHEY_PLAIN, 1,  Scalar(0,0,255), 2, 8);
 	}
 	return true;
 }
+
+
+std::string VehicleRecognizer::stringify(double x)
+ {
+   std::ostringstream o;
+   if (!(o << x))
+	   throw new std::exception("stringify(double)");
+   return o.str();
+ }
 
 Mat VehicleRecognizer::getNextFrameMat()
 {
@@ -115,6 +150,9 @@ void VehicleRecognizer::setThresholdMinimum(int value)
 
 VehicleRecognizer::VehicleRecognizer (string SourceVideoFileName, bool UseMOG2Substraction, int ThresholdMinimum, int erosion_elem, int dilation_elem, int minContoursArea)
 {
+	this->leftBorder = 0;
+	this->rightBorder = 0;
+	this->isTheFirstFrame = true;
 	this->prevContoursCount = 0;
 	this->doDrawing = true;
 	this->erosion_elem = erosion_elem;
@@ -134,6 +172,9 @@ VehicleRecognizer::VehicleRecognizer (string SourceVideoFileName, bool UseMOG2Su
 
 VehicleRecognizer::VehicleRecognizer(void)
 {
+	this->isTheFirstFrame = true;
+	this->leftBorder = 0;
+	this->rightBorder = 0;
 	this->prevContoursCount = 0;
 	this->doDrawing = true;
 	erosion_elem = 0;
@@ -264,6 +305,7 @@ void VehicleRecognizer::TrackVehicles()
 				//UPDATE VEHICLE DATA
 				vehicles[j].setCenterPoint(mc[i]);
 				vehicles[j].setBoundingRectangle(boundRect[i]);
+				vehicles[j].isActive = true;
 				//FLAG IS FOUND
 				vehicleFound = true;
 				break;
@@ -272,7 +314,7 @@ void VehicleRecognizer::TrackVehicles()
 		if (!vehicleFound)
 		{
 			//Create new vehicle
-			Vehicle v = Vehicle(mc[i], boundRect[i]);
+			Vehicle v = Vehicle(mc[i], boundRect[i], 10);
 			v.Synchronized = true;
 			vehicles.push_back(v);
 		}
@@ -283,7 +325,24 @@ void VehicleRecognizer::TrackVehicles()
 		//DELETE UNUSED
 		if (!vehicles[i].Synchronized)
 		{
-			vehicles.erase(vehicles.begin() + i);
+			if (vehicles[i].getCenterPoint().x > leftBorder && vehicles[i].getCenterPoint().x < rightBorder )
+			{
+				//Make this vehicle inactive
+				vehicles[i].isActive = false;
+				//vehicles[i].setCenterPoint(vehicles[i].nextPoint);
+				//Move to inactive
+				inactive_vehicles.push_back(vehicles[i]);
+				vehicles.erase(vehicles.begin() + i);
+				i++;
+			}
+			else
+			{
+				//Delete only active vehicles
+				if (vehicles[i].isActive)
+					vehicles.erase(vehicles.begin() + i);
+				else
+					i++;
+			}
 		}
 		else i++;
 	}

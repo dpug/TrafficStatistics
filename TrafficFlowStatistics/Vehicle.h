@@ -13,7 +13,19 @@ private:
 	Point CenterPoint;
 	Rect BoundingRectangle;
 	static int count;
+	//0 mean right 1 mean left
+	int offsetForward;
+	int offsetLeft;
+	int offsetRight;
+	int offsetBack;
 public:
+	bool direction;
+	double pForward;
+	double pLeft;
+	double pRight;
+	double pBack;
+	Point nextPoint;
+	int trajectoryMemorySize;
 	static int howMany();
 	Scalar drawingColor;
 	Point getCenterPoint();
@@ -22,8 +34,9 @@ public:
 	void setBoundingRectangle(Rect rect);
 	vector<Point> trajectory;
 	bool Synchronized;
+	bool isActive;
 	Vehicle(void);
-	Vehicle(Point CentralPoint, Rect BoundingRectangle);
+	Vehicle(Point CentralPoint, Rect BoundingRectangle, int trajectoryMemory);
 	~Vehicle(void);
 };
 
